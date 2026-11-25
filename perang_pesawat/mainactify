@@ -1,0 +1,2914 @@
+@file:Suppress("SpellCheckingInspection")
+
+package com.sky.strike
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.SoundPool
+import android.os.Bundle
+import android.os.SystemClock
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.MonetizationOn
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.MusicOff
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.hypot
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.random.Random
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+
+        setContent {
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    primary = Color(0xFF00E5FF),
+                    secondary = Color(0xFFFFC107),
+                    background = Color(0xFF07111F),
+                    surface = Color(0xFF0F1E33)
+                )
+            ) {
+                SkyStrikeApp()
+            }
+        }
+    }
+}
+
+// ============================================================================
+// STORAGE & SETTINGS
+// ============================================================================
+
+private class GameStorage(context: Context) {
+    private val prefs = context.getSharedPreferences("sky_strike_save_v1", Context.MODE_PRIVATE)
+
+    var totalCoins: Int
+        get() = prefs.getInt("total_coins", 0)
+        set(value) = prefs.edit { putInt("total_coins", value.coerceAtLeast(0)) }
+
+    var highScore: Int
+        get() = prefs.getInt("high_score", 0)
+        set(value) = prefs.edit { putInt("high_score", value.coerceAtLeast(0)) }
+
+    var firepowerLevel: Int
+        get() = prefs.getInt("firepower_lvl", 1)
+        set(value) = prefs.edit { putInt("firepower_lvl", value.coerceIn(1, 10)) }
+
+    var fireRateLevel: Int
+        get() = prefs.getInt("firerate_lvl", 1)
+        set(value) = prefs.edit { putInt("firerate_lvl", value.coerceIn(1, 10)) }
+
+    var armorLevel: Int
+        get() = prefs.getInt("armor_lvl", 1)
+        set(value) = prefs.edit { putInt("armor_lvl", value.coerceIn(1, 10)) }
+
+    var sfxEnabled: Boolean
+        get() = prefs.getBoolean("sfx_enabled", true)
+        set(value) = prefs.edit { putBoolean("sfx_enabled", value) }
+
+    var bgmEnabled: Boolean
+        get() = prefs.getBoolean("bgm_enabled", true)
+        set(value) = prefs.edit { putBoolean("bgm_enabled", value) }
+}
+
+// ============================================================================
+// SPRITE ASSET LOADER (AUTO-DETECT INDONESIAN & ENGLISH FILENAMES + AUTO-CROP)
+// ============================================================================
+
+private class SpriteBank {
+    @Volatile var player: ImageBitmap? = null
+    @Volatile var enemyScout: ImageBitmap? = null
+    @Volatile var enemyStriker: ImageBitmap? = null
+    @Volatile var enemyBomber: ImageBitmap? = null
+    @Volatile var boss: ImageBitmap? = null
+    @Volatile var bgOcean: ImageBitmap? = null
+    @Volatile var coin: ImageBitmap? = null
+    @Volatile var powerWeapon: ImageBitmap? = null
+    @Volatile var powerShield: ImageBitmap? = null
+    @Volatile var powerRepair: ImageBitmap? = null
+    @Volatile var bullet: ImageBitmap? = null
+    @Volatile var missile: ImageBitmap? = null
+    @Volatile var laser: ImageBitmap? = null
+    @Volatile var bomb: ImageBitmap? = null
+
+    fun loadFromAssets(context: Context) {
+        val spriteFiles: List<String> = runCatching {
+            context.assets.list("sprites")?.filterNotNull().orEmpty()
+        }.getOrDefault(emptyList())
+
+        player = decodeSprite(context, spriteFiles, listOf("Pesawat tempur utama pemain", "player"), maxDim = 768, trim = true)
+        enemyScout = decodeSprite(context, spriteFiles, listOf("Pesawat musuh cepat (Scout)", "enemy_scout"), maxDim = 512, trim = true)
+        enemyStriker = decodeSprite(context, spriteFiles, listOf("Pesawat musuh penembak (Striker)", "enemy_striker"), maxDim = 512, trim = true)
+        enemyBomber = decodeSprite(context, spriteFiles, listOf("Pesawat bomber berat", "enemy_bomber"), maxDim = 640, trim = true)
+        boss = decodeSprite(context, spriteFiles, listOf("Boss Sky Fortress", "boss"), maxDim = 1024, trim = true)
+        bgOcean = decodeSprite(context, spriteFiles, listOf("Peta laut", "bg_ocean"), maxDim = 1920, trim = false)
+        coin = decodeSprite(context, spriteFiles, listOf("Ikon koin", "coin"), maxDim = 256, trim = true)
+        powerWeapon = decodeSprite(context, spriteFiles, listOf("power_weapon", "senjata laser"), maxDim = 256, trim = true)
+        powerShield = decodeSprite(context, spriteFiles, listOf("Pelindung pesawat", "power_shield"), maxDim = 256, trim = true)
+        powerRepair = decodeSprite(context, spriteFiles, listOf("Pemulihan HP", "power_repair"), maxDim = 256, trim = true)
+        bullet = decodeSprite(context, spriteFiles, listOf("peluru", "bullet"), maxDim = 256, trim = true)
+        missile = decodeSprite(context, spriteFiles, listOf("rudal", "missile"), maxDim = 256, trim = true)
+        laser = decodeSprite(context, spriteFiles, listOf("senjata laser", "laser"), maxDim = 256, trim = true)
+        bomb = decodeSprite(context, spriteFiles, listOf("bom", "bomb"), maxDim = 256, trim = true)
+    }
+
+    private fun decodeSprite(
+        context: Context,
+        filesInFolder: List<String>,
+        candidateNames: List<String>,
+        maxDim: Int,
+        trim: Boolean
+    ): ImageBitmap? {
+        val supportedExts = setOf("png", "webp", "jpg", "jpeg")
+        val matchedFile = candidateNames.firstNotNullOfOrNull { candidate ->
+            filesInFolder.firstOrNull { fileName ->
+                val dotIdx = fileName.lastIndexOf('.')
+                if (dotIdx <= 0) return@firstOrNull false
+                val base = fileName.substring(0, dotIdx)
+                val ext = fileName.substring(dotIdx + 1).lowercase()
+                ext in supportedExts && base.equals(candidate, ignoreCase = true)
+            }
+        } ?: return null
+
+        val assetPath = "sprites/$matchedFile"
+        return try {
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.assets.open(assetPath).use { input ->
+                BitmapFactory.decodeStream(input, null, boundsOpts)
+            }
+
+            var sampleSize = 1
+            if (boundsOpts.outWidth > 0 && boundsOpts.outHeight > 0) {
+                while (boundsOpts.outWidth / sampleSize > maxDim ||
+                    boundsOpts.outHeight / sampleSize > maxDim
+                ) {
+                    sampleSize *= 2
+                }
+            }
+
+            val decodeOpts = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+                inScaled = false
+                inSampleSize = sampleSize
+            }
+            val raw = context.assets.open(assetPath).use { input ->
+                BitmapFactory.decodeStream(input, null, decodeOpts)
+            } ?: return null
+
+            val finalBmp = if (trim) trimTransparentBounds(raw) else raw
+            if (finalBmp !== raw) raw.recycle()
+            finalBmp.asImageBitmap()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun trimTransparentBounds(src: Bitmap): Bitmap {
+        if (!src.hasAlpha()) return src
+        val w = src.width
+        val h = src.height
+        val pixels = IntArray(w * h)
+        src.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        var minX = w
+        var minY = h
+        var maxX = -1
+        var maxY = -1
+
+        for (y in 0 until h) {
+            val rowOffset = y * w
+            for (x in 0 until w) {
+                val alpha = (pixels[rowOffset + x] ushr 24) and 0xFF
+                if (alpha > 16) {
+                    if (x < minX) minX = x
+                    if (x > maxX) maxX = x
+                    if (y < minY) minY = y
+                    if (y > maxY) maxY = y
+                }
+            }
+        }
+        if (maxX < minX || maxY < minY) return src
+        if (minX == 0 && minY == 0 && maxX == w - 1 && maxY == h - 1) return src
+        return Bitmap.createBitmap(src, minX, minY, maxX - minX + 1, maxY - minY + 1)
+    }
+}
+
+// ============================================================================
+// LOW-LATENCY SOUNDPOOL + MEDIAPLAYER BGM + SYNTH FALLBACK
+// ============================================================================
+
+private class GameAudioManager(private val context: Context) {
+    private val synthSampleRate = 22050
+
+    private val audioAttrs = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_GAME)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
+
+    private val soundPool = SoundPool.Builder()
+        .setMaxStreams(10)
+        .setAudioAttributes(audioAttrs)
+        .build()
+
+    private val loadedIds = ConcurrentHashMap.newKeySet<Int>()
+    private var mediaPlayer: MediaPlayer? = null
+    private var bgmPrepared = false
+
+    @Volatile private var released = false
+    @Volatile var sfxEnabled = true
+    @Volatile var bgmEnabled = true
+
+    @Volatile private var shootId = 0
+    @Volatile private var explodeSmallId = 0
+    @Volatile private var explodeBigId = 0
+    @Volatile private var coinId = 0
+    @Volatile private var powerUpId = 0
+    @Volatile private var playerHitId = 0
+    @Volatile private var bossWarnId = 0
+
+    private var lastShootMs = 0L
+
+    init {
+        soundPool.setOnLoadCompleteListener { _, sampleId, status ->
+            if (status == 0) loadedIds.add(sampleId)
+        }
+    }
+
+    fun initialize(initialSfx: Boolean, initialBgm: Boolean) {
+        sfxEnabled = initialSfx
+        bgmEnabled = initialBgm
+        if (released) return
+
+        val cacheDir = File(context.cacheDir, "sky_strike_sfx_v2").apply { mkdirs() }
+
+        shootId = loadSfxOrSynth("sfx_shoot", cacheDir) { buildShootWave() }
+        explodeSmallId = loadSfxOrSynth("sfx_explode", cacheDir) { buildExplosionWave(0.24f, 1.0f) }
+        explodeBigId = loadSfxOrSynth("sfx_boss_explode", cacheDir) { buildExplosionWave(0.55f, 0.55f) }
+        coinId = loadSfxOrSynth("sfx_coin", cacheDir) { buildCoinWave() }
+        powerUpId = loadSfxOrSynth("sfx_powerup", cacheDir) { buildPowerUpWave() }
+        playerHitId = loadSfxOrSynth("sfx_hit", cacheDir) { buildHitWave() }
+        bossWarnId = loadSfxOrSynth("sfx_boss_warning", cacheDir) { buildWarningWave() }
+
+        initBgm(cacheDir)
+    }
+
+    private fun loadSfxOrSynth(baseName: String, cacheDir: File, synth: () -> ShortArray): Int {
+        for (ext in arrayOf("ogg", "wav", "mp3")) {
+            val assetPath = "audio/$baseName.$ext"
+            try {
+                context.assets.openFd(assetPath).use { afd ->
+                    return soundPool.load(afd, 1)
+                }
+            } catch (_: Exception) {
+                try {
+                    val tempFile = File(cacheDir, "custom_$baseName.$ext")
+                    context.assets.open(assetPath).use { input ->
+                        FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+                    }
+                    return soundPool.load(tempFile.absolutePath, 1)
+                } catch (_: Exception) {
+                    // Not present in assets
+                }
+            }
+        }
+
+        return try {
+            val wavFile = File(cacheDir, "synth_$baseName.wav")
+            if (!wavFile.exists()) {
+                writeWavFile(wavFile, synth())
+            }
+            soundPool.load(wavFile.absolutePath, 1)
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    private fun initBgm(cacheDir: File) {
+        val bgmAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_GAME)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+
+        for (ext in arrayOf("ogg", "mp3", "wav")) {
+            val assetPath = "audio/bgm_battle.$ext"
+            val mp = MediaPlayer()
+            try {
+                mp.setAudioAttributes(bgmAttrs)
+                mp.isLooping = true
+                mp.setVolume(0.38f, 0.38f)
+
+                try {
+                    context.assets.openFd(assetPath).use { afd ->
+                        mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    }
+                } catch (_: Exception) {
+                    val bgmFile = File(cacheDir, "custom_bgm_battle.$ext")
+                    context.assets.open(assetPath).use { input ->
+                        FileOutputStream(bgmFile).use { output -> input.copyTo(output) }
+                    }
+                    mp.setDataSource(bgmFile.absolutePath)
+                }
+
+                mp.prepare()
+                mediaPlayer = mp
+                bgmPrepared = true
+                if (bgmEnabled && !released) mp.start()
+                return
+            } catch (_: Exception) {
+                runCatching { mp.release() }
+            }
+        }
+    }
+
+    fun playShoot() {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastShootMs < 60L) return
+        lastShootMs = now
+        playSound(shootId, 0.28f, 0.96f + Random.nextFloat() * 0.1f)
+    }
+
+    fun playExplode(big: Boolean) {
+        if (big) {
+            playSound(explodeBigId, 0.78f, 0.95f)
+        } else {
+            playSound(explodeSmallId, 0.48f, 0.92f + Random.nextFloat() * 0.18f)
+        }
+    }
+
+    fun playCoin() = playSound(coinId, 0.42f, 1.0f + Random.nextFloat() * 0.08f)
+    fun playPowerUp() = playSound(powerUpId, 0.62f, 1.0f)
+    fun playPlayerHit() = playSound(playerHitId, 0.75f, 1.0f)
+    fun playBossWarning() = playSound(bossWarnId, 0.68f, 1.0f)
+
+    private fun playSound(soundId: Int, volume: Float, rate: Float) {
+        if (released || !sfxEnabled || soundId == 0 || !loadedIds.contains(soundId)) return
+        soundPool.play(soundId, volume, volume, 1, 0, rate)
+    }
+
+    fun updateSfxEnabled(enabled: Boolean) {
+        sfxEnabled = enabled
+    }
+
+    fun updateBgmEnabled(enabled: Boolean) {
+        bgmEnabled = enabled
+        val mp = mediaPlayer ?: return
+        if (!bgmPrepared || released) return
+        runCatching {
+            if (enabled && !mp.isPlaying) mp.start()
+            else if (!enabled && mp.isPlaying) mp.pause()
+        }
+    }
+
+    fun onAppPause() {
+        if (released) return
+        runCatching { soundPool.autoPause() }
+        val mp = mediaPlayer
+        if (mp != null && bgmPrepared) {
+            runCatching { if (mp.isPlaying) mp.pause() }
+        }
+    }
+
+    fun onAppResume() {
+        if (released) return
+        runCatching { soundPool.autoResume() }
+        val mp = mediaPlayer
+        if (mp != null && bgmPrepared && bgmEnabled) {
+            runCatching { if (!mp.isPlaying) mp.start() }
+        }
+    }
+
+    fun release() {
+        if (released) return
+        released = true
+        runCatching { soundPool.release() }
+        runCatching {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        }
+        mediaPlayer = null
+        bgmPrepared = false
+    }
+
+    private fun buildShootWave(): ShortArray {
+        val count = (synthSampleRate * 0.075f).toInt()
+        val out = ShortArray(count)
+        var phase = 0.0
+        for (i in 0 until count) {
+            val t = i.toFloat() / count
+            val freq = 1050.0 - 720.0 * t
+            phase += 2.0 * PI * freq / synthSampleRate
+            val env = exp((-5.5f * t).toDouble()).toFloat()
+            val sq = if (sin(phase) >= 0.0) 0.55f else -0.55f
+            out[i] = (sq * env * 22000f).toInt().coerceIn(-32767, 32767).toShort()
+        }
+        return out
+    }
+
+    private fun buildExplosionWave(durationSec: Float, pitchScale: Float): ShortArray {
+        val count = (synthSampleRate * durationSec).toInt()
+        val out = ShortArray(count)
+        var lp = 0f
+        var phase = 0.0
+        for (i in 0 until count) {
+            val t = i.toFloat() / count
+            val white = Random.nextFloat() * 2f - 1f
+            val cutoff = (0.28f * (1f - t * 0.7f)).coerceIn(0.05f, 0.35f)
+            lp += cutoff * (white - lp)
+            phase += 2.0 * PI * (120.0 * pitchScale * (1.0 - t * 0.65)) / synthSampleRate
+            val rumble = sin(phase).toFloat() * 0.45f
+            val env = (1f - t) * (1f - t)
+            out[i] = ((lp * 1.4f + rumble) * env * 28000f).toInt().coerceIn(-32767, 32767).toShort()
+        }
+        return out
+    }
+
+    private fun buildCoinWave(): ShortArray {
+        val count = (synthSampleRate * 0.14f).toInt()
+        val out = ShortArray(count)
+        var phase = 0.0
+        for (i in 0 until count) {
+            val t = i.toFloat() / count
+            val freq = if (t < 0.38f) 1175.0 else 1760.0
+            phase += 2.0 * PI * freq / synthSampleRate
+            val env = (1f - t * 0.85f)
+            out[i] = (sin(phase).toFloat() * env * 21000f).toInt().coerceIn(-32767, 32767).toShort()
+        }
+        return out
+    }
+
+    private fun buildPowerUpWave(): ShortArray {
+        val count = (synthSampleRate * 0.28f).toInt()
+        val out = ShortArray(count)
+        val notes = doubleArrayOf(523.25, 659.25, 783.99, 1046.50)
+        var phase = 0.0
+        for (i in 0 until count) {
+            val t = i.toFloat() / count
+            val noteIdx = (t * notes.size).toInt().coerceIn(0, notes.lastIndex)
+            phase += 2.0 * PI * notes[noteIdx] / synthSampleRate
+            val env = (1f - t * 0.6f)
+            out[i] = (sin(phase).toFloat() * env * 22000f).toInt().coerceIn(-32767, 32767).toShort()
+        }
+        return out
+    }
+
+    private fun buildHitWave(): ShortArray {
+        val count = (synthSampleRate * 0.22f).toInt()
+        val out = ShortArray(count)
+        var phase = 0.0
+        for (i in 0 until count) {
+            val t = i.toFloat() / count
+            val freq = 260.0 - 180.0 * t
+            phase += 2.0 * PI * freq / synthSampleRate
+            val noise = (Random.nextFloat() * 2f - 1f) * 0.35f
+            val env = 1f - t
+            out[i] = ((sin(phase).toFloat() * 0.7f + noise) * env * 27000f)
+                .toInt().coerceIn(-32767, 32767).toShort()
+        }
+        return out
+    }
+
+    private fun buildWarningWave(): ShortArray {
+        val count = (synthSampleRate * 0.65f).toInt()
+        val out = ShortArray(count)
+        var phase = 0.0
+        for (i in 0 until count) {
+            val t = i.toFloat() / count
+            val cycle = (t * 2.0f) % 1.0f
+            val freq = 420.0 + 380.0 * sin(cycle * PI)
+            phase += 2.0 * PI * freq / synthSampleRate
+            val env = if (t > 0.85f) (1f - t) / 0.15f else 1f
+            out[i] = (sin(phase).toFloat() * env * 21000f).toInt().coerceIn(-32767, 32767).toShort()
+        }
+        return out
+    }
+
+    private fun writeWavFile(file: File, samples: ShortArray) {
+        val dataSize = samples.size * 2
+        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray(Charsets.US_ASCII))
+        header.putInt(36 + dataSize)
+        header.put("WAVE".toByteArray(Charsets.US_ASCII))
+        header.put("fmt ".toByteArray(Charsets.US_ASCII))
+        header.putInt(16)
+        header.putShort(1)
+        header.putShort(1)
+        header.putInt(synthSampleRate)
+        header.putInt(synthSampleRate * 2)
+        header.putShort(2)
+        header.putShort(16)
+        header.put("data".toByteArray(Charsets.US_ASCII))
+        header.putInt(dataSize)
+
+        val pcmBuffer = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN)
+        for (s in samples) pcmBuffer.putShort(s)
+
+        FileOutputStream(file).use { out ->
+            out.write(header.array())
+            out.write(pcmBuffer.array())
+        }
+    }
+}
+
+// ============================================================================
+// GAME DATA STRUCTURES (PRE-ALLOCATED POOLS FOR 120 FPS)
+// ============================================================================
+
+private enum class GamePhase {
+    MENU, PLAYING, PAUSED, GAME_OVER
+}
+
+private enum class EnemyType {
+    SCOUT, STRIKER, BOMBER, BOSS
+}
+
+private enum class PowerUpType {
+    WEAPON, SHIELD, REPAIR, COIN
+}
+
+private enum class BulletStyle {
+    NORMAL, MISSILE, LASER, BOMB
+}
+
+private class Bullet {
+    var active = false
+    var style = BulletStyle.NORMAL
+    var x = 0f
+    var y = 0f
+    var vx = 0f
+    var vy = 0f
+    var radius = 8f
+    var damage = 10f
+    var color = Color(0xFF00E5FF)
+}
+
+private class Enemy {
+    var active = false
+    var type = EnemyType.SCOUT
+    var x = 0f
+    var y = 0f
+    var vx = 0f
+    var vy = 0f
+    var radius = 40f
+    var hp = 20f
+    var maxHp = 20f
+    var shootTimer = 1f
+    var age = 0f
+    var hitFlash = 0f
+    var bossPattern = 0
+}
+
+private class PowerUp {
+    var active = false
+    var type = PowerUpType.COIN
+    var x = 0f
+    var y = 0f
+    var vy = 0f
+    var radius = 26f
+    var age = 0f
+}
+
+private class Particle {
+    var active = false
+    var x = 0f
+    var y = 0f
+    var vx = 0f
+    var vy = 0f
+    var life = 0f
+    var maxLife = 0.5f
+    var size = 8f
+    var color = Color.Yellow
+}
+
+private class Shockwave {
+    var active = false
+    var x = 0f
+    var y = 0f
+    var radius = 10f
+    var maxRadius = 120f
+    var life = 0f
+    var maxLife = 0.3f
+    var color = Color(0xFFFFAB40)
+}
+
+private class Island(
+    var x: Float,
+    var y: Float,
+    var radiusX: Float,
+    var radiusY: Float,
+    var rotation: Float
+)
+
+private class Cloud(
+    var x: Float,
+    var y: Float,
+    var radius: Float,
+    var speedFactor: Float,
+    var alpha: Float
+)
+
+// ============================================================================
+// CORE GAME ENGINE
+// ============================================================================
+
+private class SkyStrikeEngine(
+    private val storage: GameStorage,
+    val sprites: SpriteBank,
+    private val audio: GameAudioManager
+) {
+    var phase by mutableStateOf(GamePhase.MENU)
+    var score by mutableIntStateOf(0)
+    var runCoins by mutableIntStateOf(0)
+    var totalCoins by mutableIntStateOf(storage.totalCoins)
+    var highScore by mutableIntStateOf(storage.highScore)
+    var firepowerLevel by mutableIntStateOf(storage.firepowerLevel)
+    var fireRateLevel by mutableIntStateOf(storage.fireRateLevel)
+    var armorLevel by mutableIntStateOf(storage.armorLevel)
+    var sfxEnabled by mutableStateOf(storage.sfxEnabled)
+    var bgmEnabled by mutableStateOf(storage.bgmEnabled)
+
+    var wave by mutableIntStateOf(1)
+    var playerHp by mutableIntStateOf(5)
+    var playerMaxHp by mutableIntStateOf(5)
+    var weaponLevel by mutableIntStateOf(1)
+    var shieldActive by mutableStateOf(false)
+    var bossHpFraction by mutableFloatStateOf(0f)
+    var bannerText by mutableStateOf("")
+    var hapticTrigger by mutableIntStateOf(0)
+
+    var frameTick by mutableLongStateOf(0L)
+
+    var screenW = 0f
+        private set
+    var screenH = 0f
+        private set
+    var unit = 1f
+        private set
+    private var viewportReady = false
+
+    var playerX = 0f
+        private set
+    var playerY = 0f
+        private set
+    var playerBank = 0f
+        private set
+    var invulnTimer = 0f
+        private set
+    var shieldTimer = 0f
+        private set
+    var muzzleFlashTimer = 0f
+        private set
+    private var shootCooldown = 0f
+
+    var shakeOffsetX = 0f
+        private set
+    var shakeOffsetY = 0f
+        private set
+    private var shakeTimer = 0f
+    private var shakeIntensity = 0f
+
+    private var waveEnemiesToSpawn = 0
+    private var spawnTimer = 0f
+    private var bossWarningTimer = 0f
+    private var bossSpawnedThisWave = false
+    private var bannerTimer = 0f
+    private var oceanScrollPx = 0f
+    private var elapsedTime = 0f
+
+    val playerBullets = Array(140) { Bullet() }
+    val enemyBullets = Array(140) { Bullet() }
+    val enemies = Array(36) { Enemy() }
+    val powerUps = Array(28) { PowerUp() }
+    val particles = Array(180) { Particle() }
+    val shockwaves = Array(18) { Shockwave() }
+
+    val islands = mutableListOf<Island>()
+    val clouds = mutableListOf<Cloud>()
+
+    val reusablePath = Path()
+
+    fun toggleSfx() {
+        sfxEnabled = !sfxEnabled
+        storage.sfxEnabled = sfxEnabled
+        audio.updateSfxEnabled(sfxEnabled)
+    }
+
+    fun toggleBgm() {
+        bgmEnabled = !bgmEnabled
+        storage.bgmEnabled = bgmEnabled
+        audio.updateBgmEnabled(bgmEnabled)
+    }
+
+    fun upgradeCost(currentLevel: Int): Int = currentLevel * 100
+
+    fun buyFirepower(): Boolean {
+        if (firepowerLevel >= 10) return false
+        val cost = upgradeCost(firepowerLevel)
+        if (totalCoins < cost) return false
+        totalCoins -= cost
+        firepowerLevel++
+        storage.totalCoins = totalCoins
+        storage.firepowerLevel = firepowerLevel
+        audio.playPowerUp()
+        return true
+    }
+
+    fun buyFireRate(): Boolean {
+        if (fireRateLevel >= 10) return false
+        val cost = upgradeCost(fireRateLevel)
+        if (totalCoins < cost) return false
+        totalCoins -= cost
+        fireRateLevel++
+        storage.totalCoins = totalCoins
+        storage.fireRateLevel = fireRateLevel
+        audio.playPowerUp()
+        return true
+    }
+
+    fun buyArmor(): Boolean {
+        if (armorLevel >= 10) return false
+        val cost = upgradeCost(armorLevel)
+        if (totalCoins < cost) return false
+        totalCoins -= cost
+        armorLevel++
+        storage.totalCoins = totalCoins
+        storage.armorLevel = armorLevel
+        audio.playPowerUp()
+        return true
+    }
+
+    fun setViewport(width: Float, height: Float) {
+        if (width <= 0f || height <= 0f) return
+        screenW = width
+        screenH = height
+        unit = width / 1080f
+
+        if (!viewportReady) {
+            viewportReady = true
+            playerX = screenW * 0.5f
+            playerY = screenH * 0.78f
+            initScenery()
+        } else {
+            playerX = playerX.coerceIn(50f * unit, screenW - 50f * unit)
+            playerY = playerY.coerceIn(screenH * 0.14f, screenH - 70f * unit)
+        }
+    }
+
+    private fun initScenery() {
+        islands.clear()
+        clouds.clear()
+        repeat(4) { i ->
+            islands.add(
+                Island(
+                    x = Random.nextFloat() * screenW,
+                    y = (i / 4f) * screenH,
+                    radiusX = (110f + Random.nextFloat() * 140f) * unit,
+                    radiusY = (70f + Random.nextFloat() * 100f) * unit,
+                    rotation = Random.nextFloat() * 360f
+                )
+            )
+        }
+        repeat(7) { i ->
+            clouds.add(
+                Cloud(
+                    x = Random.nextFloat() * screenW,
+                    y = (i / 7f) * screenH,
+                    radius = (85f + Random.nextFloat() * 120f) * unit,
+                    speedFactor = 1.4f + Random.nextFloat() * 0.9f,
+                    alpha = 0.06f + Random.nextFloat() * 0.06f
+                )
+            )
+        }
+    }
+
+    fun startNewGame() {
+        clearPools()
+        score = 0
+        runCoins = 0
+        wave = 1
+        weaponLevel = 1
+        playerMaxHp = 4 + armorLevel
+        playerHp = playerMaxHp
+        invulnTimer = 1.2f
+        shieldTimer = 0f
+        shieldActive = false
+        muzzleFlashTimer = 0f
+        shakeTimer = 0f
+        shakeOffsetX = 0f
+        shakeOffsetY = 0f
+        shootCooldown = 0f
+        bossHpFraction = 0f
+
+        if (viewportReady) {
+            playerX = screenW * 0.5f
+            playerY = screenH * 0.80f
+        }
+        playerBank = 0f
+
+        setupWave(1)
+        phase = GamePhase.PLAYING
+    }
+
+    fun pauseGame() {
+        if (phase == GamePhase.PLAYING) phase = GamePhase.PAUSED
+    }
+
+    fun resumeGame() {
+        if (phase == GamePhase.PAUSED) phase = GamePhase.PLAYING
+    }
+
+    fun returnToMenu() {
+        clearPools()
+        bossHpFraction = 0f
+        bannerText = ""
+        shakeTimer = 0f
+        shakeOffsetX = 0f
+        shakeOffsetY = 0f
+        if (viewportReady) {
+            playerX = screenW * 0.5f
+            playerY = screenH * 0.78f
+        }
+        phase = GamePhase.MENU
+    }
+
+    private fun clearPools() {
+        for (b in playerBullets) b.active = false
+        for (b in enemyBullets) b.active = false
+        for (e in enemies) e.active = false
+        for (p in powerUps) p.active = false
+        for (pt in particles) pt.active = false
+        for (sw in shockwaves) sw.active = false
+    }
+
+    private fun setupWave(waveNum: Int) {
+        wave = waveNum
+        bossSpawnedThisWave = false
+        bossWarningTimer = 0f
+        bossHpFraction = 0f
+        waveEnemiesToSpawn = if (waveNum % 3 == 0) 6 + waveNum else 10 + waveNum * 3
+        spawnTimer = 0.7f
+        showBanner("WAVE $waveNum", 2.0f)
+    }
+
+    private fun showBanner(text: String, duration: Float) {
+        bannerText = text
+        bannerTimer = duration
+    }
+
+    private fun triggerShake(duration: Float, intensityPx: Float) {
+        if (intensityPx >= shakeIntensity || shakeTimer <= 0f) {
+            shakeTimer = duration
+            shakeIntensity = intensityPx
+        }
+    }
+
+    fun movePlayer(dx: Float, dy: Float) {
+        if (phase != GamePhase.PLAYING || !viewportReady) return
+        val marginX = 56f * unit
+        val minY = screenH * 0.14f
+        val maxY = screenH - 72f * unit
+
+        playerX = (playerX + dx).coerceIn(marginX, screenW - marginX)
+        playerY = (playerY + dy).coerceIn(minY, maxY)
+
+        val targetBank = (dx / (24f * unit)).coerceIn(-1f, 1f)
+        playerBank = playerBank * 0.65f + targetBank * 0.35f
+    }
+
+    fun update(dt: Float) {
+        if (!viewportReady) return
+        elapsedTime += dt
+
+        if (phase == GamePhase.MENU || phase == GamePhase.PLAYING) {
+            updateScenery(dt)
+        }
+
+        if (phase == GamePhase.MENU) {
+            playerX = screenW * 0.5f + sin(elapsedTime * 1.4f) * (60f * unit)
+            playerY = screenH * 0.76f + cos(elapsedTime * 2.1f) * (14f * unit)
+            playerBank = cos(elapsedTime * 1.4f) * 0.35f
+            frameTick++
+            return
+        }
+
+        if (phase != GamePhase.PLAYING) return
+
+        playerBank *= (1f - (8f * dt).coerceAtMost(1f))
+
+        if (invulnTimer > 0f) invulnTimer = (invulnTimer - dt).coerceAtLeast(0f)
+        if (muzzleFlashTimer > 0f) muzzleFlashTimer = (muzzleFlashTimer - dt).coerceAtLeast(0f)
+        if (shieldTimer > 0f) {
+            shieldTimer = (shieldTimer - dt).coerceAtLeast(0f)
+            if (shieldTimer <= 0f) shieldActive = false
+        }
+        if (bannerTimer > 0f) {
+            bannerTimer -= dt
+            if (bannerTimer <= 0f) bannerText = ""
+        }
+
+        if (shakeTimer > 0f) {
+            shakeTimer = (shakeTimer - dt).coerceAtLeast(0f)
+            val decay = (shakeTimer * 4f).coerceIn(0f, 1f)
+            shakeOffsetX = (Random.nextFloat() * 2f - 1f) * shakeIntensity * decay
+            shakeOffsetY = (Random.nextFloat() * 2f - 1f) * shakeIntensity * decay
+        } else {
+            shakeOffsetX = 0f
+            shakeOffsetY = 0f
+            shakeIntensity = 0f
+        }
+
+        shootCooldown -= dt
+        if (shootCooldown <= 0f) {
+            firePlayerWeapon()
+            val baseInterval = (0.19f - (fireRateLevel - 1) * 0.011f).coerceAtLeast(0.085f)
+            shootCooldown = baseInterval
+        }
+
+        updateWaveSpawning(dt)
+        updatePlayerBullets(dt)
+        updateEnemies(dt)
+        updateEnemyBullets(dt)
+        updatePowerUps(dt)
+        updateParticles(dt)
+        updateShockwaves(dt)
+
+        frameTick++
+    }
+
+    private fun updateScenery(dt: Float) {
+        val baseSpeed = 190f * unit
+        oceanScrollPx += baseSpeed * dt
+        if (oceanScrollPx > 100000f) oceanScrollPx = 0f
+
+        for (island in islands) {
+            island.y += baseSpeed * 0.65f * dt
+            if (island.y - island.radiusY > screenH + 100f * unit) {
+                island.y = -island.radiusY - 80f * unit
+                island.x = Random.nextFloat() * screenW
+            }
+        }
+        for (cloud in clouds) {
+            cloud.y += baseSpeed * cloud.speedFactor * dt
+            if (cloud.y - cloud.radius > screenH + 80f * unit) {
+                cloud.y = -cloud.radius - 60f * unit
+                cloud.x = Random.nextFloat() * screenW
+            }
+        }
+    }
+
+    private fun firePlayerWeapon() {
+        val dmg = 10f + (firepowerLevel - 1) * 4.5f
+        val speed = -1450f * unit
+        val noseY = playerY - 48f * unit
+        val spreadVx = 240f * unit
+
+        muzzleFlashTimer = 0.045f
+        audio.playShoot()
+
+        when (weaponLevel) {
+            1 -> {
+                spawnPlayerBullet(playerX, noseY, 0f, speed, dmg, Color(0xFF00E5FF), BulletStyle.NORMAL)
+            }
+            2 -> {
+                spawnPlayerBullet(playerX - 22f * unit, noseY + 8f * unit, 0f, speed, dmg, Color(0xFF00E5FF), BulletStyle.NORMAL)
+                spawnPlayerBullet(playerX + 22f * unit, noseY + 8f * unit, 0f, speed, dmg, Color(0xFF00E5FF), BulletStyle.NORMAL)
+            }
+            3 -> {
+                spawnPlayerBullet(playerX, noseY, 0f, speed, dmg * 1.05f, Color(0xFF40C4FF), BulletStyle.NORMAL)
+                spawnPlayerBullet(playerX - 30f * unit, noseY + 12f * unit, -spreadVx * 0.65f, speed * 0.94f, dmg * 0.95f, Color(0xFFFFAB40), BulletStyle.MISSILE)
+                spawnPlayerBullet(playerX + 30f * unit, noseY + 12f * unit, spreadVx * 0.65f, speed * 0.94f, dmg * 0.95f, Color(0xFFFFAB40), BulletStyle.MISSILE)
+            }
+            4 -> {
+                spawnPlayerBullet(playerX - 18f * unit, noseY, 0f, speed, dmg, Color(0xFF69F0AE), BulletStyle.NORMAL)
+                spawnPlayerBullet(playerX + 18f * unit, noseY, 0f, speed, dmg, Color(0xFF69F0AE), BulletStyle.NORMAL)
+                spawnPlayerBullet(playerX - 42f * unit, noseY + 16f * unit, -spreadVx * 0.95f, speed * 0.92f, dmg * 0.95f, Color(0xFFFFAB40), BulletStyle.MISSILE)
+                spawnPlayerBullet(playerX + 42f * unit, noseY + 16f * unit, spreadVx * 0.95f, speed * 0.92f, dmg * 0.95f, Color(0xFFFFAB40), BulletStyle.MISSILE)
+            }
+            else -> {
+                spawnPlayerBullet(playerX, noseY - 8f * unit, 0f, speed * 1.08f, dmg * 1.25f, Color(0xFFFFD740), BulletStyle.LASER)
+                spawnPlayerBullet(playerX - 24f * unit, noseY + 6f * unit, -spreadVx * 0.42f, speed, dmg, Color(0xFF00E5FF), BulletStyle.NORMAL)
+                spawnPlayerBullet(playerX + 24f * unit, noseY + 6f * unit, spreadVx * 0.42f, speed, dmg, Color(0xFF00E5FF), BulletStyle.NORMAL)
+                spawnPlayerBullet(playerX - 48f * unit, noseY + 18f * unit, -spreadVx * 1.1f, speed * 0.9f, dmg * 0.95f, Color(0xFFFFAB40), BulletStyle.MISSILE)
+                spawnPlayerBullet(playerX + 48f * unit, noseY + 18f * unit, spreadVx * 1.1f, speed * 0.9f, dmg * 0.95f, Color(0xFFFFAB40), BulletStyle.MISSILE)
+            }
+        }
+    }
+
+    private fun spawnPlayerBullet(
+        x: Float,
+        y: Float,
+        vx: Float,
+        vy: Float,
+        damage: Float,
+        color: Color,
+        style: BulletStyle = BulletStyle.NORMAL
+    ) {
+        for (b in playerBullets) {
+            if (!b.active) {
+                b.active = true
+                b.style = style
+                b.x = x
+                b.y = y
+                b.vx = vx
+                b.vy = vy
+                b.radius = when (style) {
+                    BulletStyle.LASER -> 14f * unit
+                    BulletStyle.MISSILE -> 12f * unit
+                    BulletStyle.NORMAL, BulletStyle.BOMB -> 9f * unit
+                }
+                b.damage = damage
+                b.color = color
+                return
+            }
+        }
+    }
+
+    private fun spawnEnemyBullet(
+        x: Float,
+        y: Float,
+        vx: Float,
+        vy: Float,
+        radius: Float = 11f * unit,
+        color: Color = Color(0xFFFF5252),
+        style: BulletStyle = BulletStyle.NORMAL
+    ) {
+        for (b in enemyBullets) {
+            if (!b.active) {
+                b.active = true
+                b.style = style
+                b.x = x
+                b.y = y
+                b.vx = vx
+                b.vy = vy
+                b.radius = radius
+                b.damage = 1f
+                b.color = color
+                return
+            }
+        }
+    }
+
+    private fun updateWaveSpawning(dt: Float) {
+        val activeEnemies = countActiveEnemies()
+
+        if (waveEnemiesToSpawn > 0) {
+            spawnTimer -= dt
+            if (spawnTimer <= 0f) {
+                spawnWaveEnemy()
+                waveEnemiesToSpawn--
+                val baseDelay = (1.15f - wave * 0.055f).coerceAtLeast(0.42f)
+                spawnTimer = baseDelay + Random.nextFloat() * 0.35f
+            }
+            return
+        }
+
+        if (wave % 3 == 0 && !bossSpawnedThisWave) {
+            if (activeEnemies == 0) {
+                if (bossWarningTimer <= 0f) {
+                    bossWarningTimer = 2.4f
+                    showBanner("WARNING: SKY FORTRESS", 2.4f)
+                    audio.playBossWarning()
+                } else {
+                    bossWarningTimer -= dt
+                    if (bossWarningTimer <= 0f) {
+                        spawnBoss()
+                        bossSpawnedThisWave = true
+                    }
+                }
+            }
+        } else if (activeEnemies == 0) {
+            setupWave(wave + 1)
+        }
+    }
+
+    private fun countActiveEnemies(): Int {
+        var count = 0
+        for (e in enemies) if (e.active) count++
+        return count
+    }
+
+    private fun spawnWaveEnemy() {
+        val e = findInactiveEnemy() ?: return
+        val pad = 80f * unit
+        val roll = Random.nextFloat()
+
+        e.active = true
+        e.x = pad + Random.nextFloat() * (screenW - pad * 2f)
+        e.y = -90f * unit
+        e.age = 0f
+        e.hitFlash = 0f
+        e.bossPattern = 0
+
+        when {
+            wave >= 2 && roll < 0.16f -> {
+                e.type = EnemyType.BOMBER
+                e.radius = 68f * unit
+                e.maxHp = 85f + wave * 16f
+                e.hp = e.maxHp
+                e.vx = 0f
+                e.vy = (135f + wave * 6f) * unit
+                e.shootTimer = 1.4f
+            }
+            roll < 0.52f -> {
+                e.type = EnemyType.STRIKER
+                e.radius = 48f * unit
+                e.maxHp = 32f + wave * 7f
+                e.hp = e.maxHp
+                e.vx = 0f
+                e.vy = (220f + wave * 12f) * unit
+                e.shootTimer = 1.1f + Random.nextFloat() * 0.6f
+            }
+            else -> {
+                e.type = EnemyType.SCOUT
+                e.radius = 40f * unit
+                e.maxHp = 14f + wave * 3.5f
+                e.hp = e.maxHp
+                e.vx = (Random.nextFloat() - 0.5f) * 180f * unit
+                e.vy = (320f + wave * 18f) * unit
+                e.shootTimer = 1.6f
+            }
+        }
+    }
+
+    private fun spawnBoss() {
+        val boss = findInactiveEnemy() ?: return
+        val bossTier = (wave / 3).coerceAtLeast(1)
+        boss.active = true
+        boss.type = EnemyType.BOSS
+        boss.x = screenW * 0.5f
+        boss.y = -180f * unit
+        boss.vx = (150f + bossTier * 20f) * unit
+        boss.vy = 180f * unit
+        boss.radius = 132f * unit
+        boss.maxHp = 520f + bossTier * 420f
+        boss.hp = boss.maxHp
+        boss.shootTimer = 1.3f
+        boss.age = 0f
+        boss.hitFlash = 0f
+        boss.bossPattern = 0
+        bossHpFraction = 1f
+    }
+
+    private fun findInactiveEnemy(): Enemy? {
+        for (e in enemies) if (!e.active) return e
+        return null
+    }
+
+    private fun updatePlayerBullets(dt: Float) {
+        for (b in playerBullets) {
+            if (!b.active) continue
+            b.x += b.vx * dt
+            b.y += b.vy * dt
+
+            if (b.y < -60f * unit || b.x < -60f * unit || b.x > screenW + 60f * unit) {
+                b.active = false
+                continue
+            }
+
+            for (e in enemies) {
+                if (!e.active) continue
+                val dx = b.x - e.x
+                val dy = b.y - e.y
+                val hitR = b.radius + e.radius
+                if (dx * dx + dy * dy <= hitR * hitR) {
+                    b.active = false
+                    e.hp -= b.damage
+                    e.hitFlash = 0.08f
+                    spawnBurst(b.x, b.y, 4, Color(0xFF80D8FF), 180f * unit)
+
+                    if (e.type == EnemyType.BOSS) {
+                        bossHpFraction = (e.hp / e.maxHp).coerceIn(0f, 1f)
+                    }
+                    if (e.hp <= 0f) {
+                        onEnemyDestroyed(e)
+                    }
+                    break
+                }
+            }
+        }
+    }
+
+    private fun updateEnemies(dt: Float) {
+        val playerHitR = 22f * unit
+
+        for (e in enemies) {
+            if (!e.active) continue
+            e.age += dt
+            if (e.hitFlash > 0f) e.hitFlash = (e.hitFlash - dt).coerceAtLeast(0f)
+
+            when (e.type) {
+                EnemyType.SCOUT -> {
+                    e.x += (e.vx + sin(e.age * 4f) * 140f * unit) * dt
+                    e.y += e.vy * dt
+                    e.x = e.x.coerceIn(e.radius, screenW - e.radius)
+
+                    if (wave >= 3) {
+                        e.shootTimer -= dt
+                        if (e.shootTimer <= 0f && e.y > 40f * unit && e.y < screenH * 0.6f) {
+                            spawnEnemyBullet(e.x, e.y + e.radius * 0.6f, 0f, 520f * unit)
+                            e.shootTimer = 2.4f
+                        }
+                    }
+                }
+                EnemyType.STRIKER -> {
+                    e.y += e.vy * dt
+                    e.shootTimer -= dt
+                    if (e.shootTimer <= 0f && e.y > 40f * unit && e.y < screenH * 0.65f) {
+                        val dx = playerX - e.x
+                        val dy = playerY - e.y
+                        val dist = hypot(dx, dy).coerceAtLeast(1f)
+                        val speed = (470f + wave * 14f) * unit
+                        spawnEnemyBullet(e.x, e.y + e.radius * 0.6f, dx / dist * speed, dy / dist * speed)
+                        e.shootTimer = (1.9f - wave * 0.05f).coerceAtLeast(1.0f)
+                    }
+                }
+                EnemyType.BOMBER -> {
+                    e.y += e.vy * dt
+                    e.shootTimer -= dt
+                    if (e.shootTimer <= 0f && e.y > 60f * unit && e.y < screenH * 0.6f) {
+                        val speed = 400f * unit
+                        spawnEnemyBullet(e.x, e.y + e.radius * 0.6f, 0f, speed, 18f * unit, Color(0xFFFF9100), BulletStyle.BOMB)
+                        spawnEnemyBullet(e.x - 24f * unit, e.y + e.radius * 0.5f, -150f * unit, speed * 0.94f, 12f * unit, Color(0xFFFF9100))
+                        spawnEnemyBullet(e.x + 24f * unit, e.y + e.radius * 0.5f, 150f * unit, speed * 0.94f, 12f * unit, Color(0xFFFF9100))
+                        e.shootTimer = 2.1f
+                    }
+                }
+                EnemyType.BOSS -> {
+                    val targetY = screenH * 0.21f
+                    if (e.y < targetY) {
+                        e.y += e.vy * dt
+                    } else {
+                        e.x += e.vx * dt
+                        val minX = e.radius + 24f * unit
+                        val maxX = screenW - e.radius - 24f * unit
+                        if (e.x < minX) {
+                            e.x = minX
+                            e.vx = abs(e.vx)
+                        } else if (e.x > maxX) {
+                            e.x = maxX
+                            e.vx = -abs(e.vx)
+                        }
+
+                        e.shootTimer -= dt
+                        if (e.shootTimer <= 0f) {
+                            fireBossPattern(e)
+                            e.bossPattern = (e.bossPattern + 1) % 2
+                            e.shootTimer = (1.35f - (wave / 3) * 0.08f).coerceAtLeast(0.75f)
+                        }
+                    }
+                }
+            }
+
+            if (e.type != EnemyType.BOSS && e.y - e.radius > screenH + 80f * unit) {
+                e.active = false
+                continue
+            }
+
+            val dx = playerX - e.x
+            val dy = playerY - e.y
+            val hitR = playerHitR + e.radius * 0.78f
+            if (dx * dx + dy * dy <= hitR * hitR) {
+                damagePlayer()
+                if (e.type != EnemyType.BOSS) {
+                    e.hp -= 40f
+                    if (e.hp <= 0f) onEnemyDestroyed(e)
+                }
+            }
+        }
+    }
+
+    private fun fireBossPattern(boss: Enemy) {
+        val speed = (460f + (wave / 3) * 28f) * unit
+        if (boss.bossPattern == 0) {
+            val count = 7
+            for (i in 0 until count) {
+                val angleDeg = 50f + (80f / (count - 1)) * i
+                val rad = angleDeg * (PI.toFloat() / 180f)
+                spawnEnemyBullet(
+                    x = boss.x,
+                    y = boss.y + boss.radius * 0.55f,
+                    vx = cos(rad) * speed,
+                    vy = sin(rad) * speed,
+                    radius = 13f * unit,
+                    color = Color(0xFFFF1744),
+                    style = BulletStyle.NORMAL
+                )
+            }
+        } else {
+            val wingOffsets = floatArrayOf(-76f * unit, 76f * unit)
+            for (offset in wingOffsets) {
+                val sx = boss.x + offset
+                val sy = boss.y + boss.radius * 0.4f
+                val dx = playerX - sx
+                val dy = playerY - sy
+                val dist = hypot(dx, dy).coerceAtLeast(1f)
+                spawnEnemyBullet(
+                    x = sx,
+                    y = sy,
+                    vx = dx / dist * speed * 1.12f,
+                    vy = dy / dist * speed * 1.12f,
+                    radius = 16f * unit,
+                    color = Color(0xFFFFD740),
+                    style = BulletStyle.MISSILE
+                )
+            }
+        }
+    }
+
+    private fun onEnemyDestroyed(e: Enemy) {
+        e.active = false
+        when (e.type) {
+            EnemyType.SCOUT -> {
+                score += 100
+                audio.playExplode(big = false)
+                spawnBurst(e.x, e.y, 14, Color(0xFFFFAB40), 340f * unit)
+                spawnShockwave(e.x, e.y, 85f * unit, Color(0xFFFFAB40))
+                if (Random.nextFloat() < 0.45f) spawnPowerUp(e.x, e.y, PowerUpType.COIN)
+            }
+            EnemyType.STRIKER -> {
+                score += 220
+                audio.playExplode(big = false)
+                spawnBurst(e.x, e.y, 20, Color(0xFFFF5252), 400f * unit)
+                spawnShockwave(e.x, e.y, 110f * unit, Color(0xFFFF5252))
+                spawnPowerUp(e.x, e.y, PowerUpType.COIN)
+                if (Random.nextFloat() < 0.14f) {
+                    spawnPowerUp(e.x + 20f * unit, e.y, randomCombatPowerUp())
+                }
+            }
+            EnemyType.BOMBER -> {
+                score += 500
+                audio.playExplode(big = true)
+                triggerShake(0.22f, 14f * unit)
+                spawnBurst(e.x, e.y, 30, Color(0xFFFF9100), 480f * unit)
+                spawnShockwave(e.x, e.y, 165f * unit, Color(0xFFFF9100))
+                spawnPowerUp(e.x - 24f * unit, e.y, PowerUpType.COIN)
+                spawnPowerUp(e.x + 24f * unit, e.y, randomCombatPowerUp())
+            }
+            EnemyType.BOSS -> {
+                bossHpFraction = 0f
+                score += 2500 * (wave / 3).coerceAtLeast(1)
+                hapticTrigger++
+                audio.playExplode(big = true)
+                triggerShake(0.55f, 28f * unit)
+                spawnBurst(e.x, e.y, 65, Color(0xFFFFD740), 650f * unit)
+                spawnBurst(e.x, e.y, 45, Color(0xFFFF5252), 520f * unit)
+                spawnShockwave(e.x, e.y, 320f * unit, Color(0xFFFFD740))
+                spawnShockwave(e.x, e.y, 220f * unit, Color(0xFFFF5252))
+                repeat(6) {
+                    spawnPowerUp(
+                        e.x + (Random.nextFloat() - 0.5f) * 180f * unit,
+                        e.y + (Random.nextFloat() - 0.5f) * 100f * unit,
+                        PowerUpType.COIN
+                    )
+                }
+                spawnPowerUp(e.x - 45f * unit, e.y, PowerUpType.WEAPON)
+                spawnPowerUp(e.x + 45f * unit, e.y, PowerUpType.REPAIR)
+                showBanner("BOSS DEFEATED!", 2.2f)
+            }
+        }
+    }
+
+    private fun randomCombatPowerUp(): PowerUpType {
+        val r = Random.nextFloat()
+        return when {
+            r < 0.48f -> PowerUpType.WEAPON
+            r < 0.78f -> PowerUpType.SHIELD
+            else -> PowerUpType.REPAIR
+        }
+    }
+
+    private fun updateEnemyBullets(dt: Float) {
+        val playerHitR = 20f * unit
+        for (b in enemyBullets) {
+            if (!b.active) continue
+            b.x += b.vx * dt
+            b.y += b.vy * dt
+
+            if (b.y > screenH + 60f * unit || b.y < -60f * unit ||
+                b.x < -60f * unit || b.x > screenW + 60f * unit
+            ) {
+                b.active = false
+                continue
+            }
+
+            val dx = b.x - playerX
+            val dy = b.y - playerY
+            val hitR = b.radius + playerHitR
+            if (dx * dx + dy * dy <= hitR * hitR) {
+                b.active = false
+                damagePlayer()
+            }
+        }
+    }
+
+    private fun damagePlayer() {
+        if (invulnTimer > 0f) return
+
+        if (shieldTimer > 0f) {
+            shieldTimer = (shieldTimer - 3.0f).coerceAtLeast(0f)
+            if (shieldTimer <= 0f) shieldActive = false
+            invulnTimer = 0.65f
+            audio.playPlayerHit()
+            triggerShake(0.14f, 10f * unit)
+            spawnBurst(playerX, playerY, 18, Color(0xFF00E5FF), 360f * unit)
+            spawnShockwave(playerX, playerY, 130f * unit, Color(0xFF00E5FF))
+            return
+        }
+
+        playerHp--
+        hapticTrigger++
+        invulnTimer = 1.6f
+        audio.playPlayerHit()
+        triggerShake(0.28f, 20f * unit)
+        if (weaponLevel > 1) weaponLevel--
+        spawnBurst(playerX, playerY, 26, Color(0xFFFF5252), 440f * unit)
+        spawnShockwave(playerX, playerY, 150f * unit, Color(0xFFFF5252))
+
+        if (playerHp <= 0) {
+            triggerGameOver()
+        }
+    }
+
+    private fun triggerGameOver() {
+        audio.playExplode(big = true)
+        triggerShake(0.45f, 24f * unit)
+        spawnBurst(playerX, playerY, 55, Color(0xFFFFAB40), 560f * unit)
+        spawnShockwave(playerX, playerY, 240f * unit, Color(0xFFFFAB40))
+        totalCoins += runCoins
+        storage.totalCoins = totalCoins
+        if (score > highScore) {
+            highScore = score
+            storage.highScore = highScore
+        }
+        phase = GamePhase.GAME_OVER
+    }
+
+    private fun spawnPowerUp(x: Float, y: Float, type: PowerUpType) {
+        for (p in powerUps) {
+            if (!p.active) {
+                p.active = true
+                p.type = type
+                p.x = x.coerceIn(40f * unit, screenW - 40f * unit)
+                p.y = y
+                p.vy = if (type == PowerUpType.COIN) 230f * unit else 185f * unit
+                p.radius = if (type == PowerUpType.COIN) 24f * unit else 34f * unit
+                p.age = 0f
+                return
+            }
+        }
+    }
+
+    private fun updatePowerUps(dt: Float) {
+        val magnetDist = 230f * unit
+        val pickupDist = 56f * unit
+
+        for (p in powerUps) {
+            if (!p.active) continue
+            p.age += dt
+            p.y += p.vy * dt
+
+            val dx = playerX - p.x
+            val dy = playerY - p.y
+            val dist = hypot(dx, dy)
+
+            if (dist < magnetDist && dist > 1f) {
+                val pull = 780f * unit * dt
+                p.x += dx / dist * pull
+                p.y += dy / dist * pull
+            }
+
+            if (dist <= pickupDist + p.radius) {
+                p.active = false
+                when (p.type) {
+                    PowerUpType.COIN -> {
+                        runCoins += 10
+                        score += 25
+                        audio.playCoin()
+                        spawnBurst(p.x, p.y, 6, Color(0xFFFFD740), 220f * unit)
+                    }
+                    PowerUpType.WEAPON -> {
+                        audio.playPowerUp()
+                        if (weaponLevel < 5) {
+                            weaponLevel++
+                            showBanner("WEAPON LV.$weaponLevel", 1.2f)
+                        } else {
+                            score += 300
+                        }
+                        spawnBurst(p.x, p.y, 12, Color(0xFF00E5FF), 300f * unit)
+                    }
+                    PowerUpType.SHIELD -> {
+                        audio.playPowerUp()
+                        shieldTimer = 8.0f
+                        shieldActive = true
+                        showBanner("ENERGY SHIELD!", 1.2f)
+                        spawnBurst(p.x, p.y, 12, Color(0xFF40C4FF), 300f * unit)
+                    }
+                    PowerUpType.REPAIR -> {
+                        audio.playPowerUp()
+                        if (playerHp < playerMaxHp) {
+                            playerHp++
+                            showBanner("HULL REPAIRED +1", 1.2f)
+                        } else {
+                            score += 250
+                        }
+                        spawnBurst(p.x, p.y, 12, Color(0xFF69F0AE), 300f * unit)
+                    }
+                }
+                continue
+            }
+
+            if (p.y - p.radius > screenH + 60f * unit) {
+                p.active = false
+            }
+        }
+    }
+
+    private fun spawnBurst(x: Float, y: Float, count: Int, color: Color, maxSpeed: Float) {
+        var spawned = 0
+        for (pt in particles) {
+            if (!pt.active) {
+                val angle = Random.nextFloat() * 2f * PI.toFloat()
+                val speed = (0.25f + Random.nextFloat() * 0.75f) * maxSpeed
+                pt.active = true
+                pt.x = x
+                pt.y = y
+                pt.vx = cos(angle) * speed
+                pt.vy = sin(angle) * speed
+                pt.maxLife = 0.25f + Random.nextFloat() * 0.35f
+                pt.life = pt.maxLife
+                pt.size = (5f + Random.nextFloat() * 10f) * unit
+                pt.color = color
+                spawned++
+                if (spawned >= count) return
+            }
+        }
+    }
+
+    private fun spawnShockwave(x: Float, y: Float, maxRadius: Float, color: Color) {
+        for (sw in shockwaves) {
+            if (!sw.active) {
+                sw.active = true
+                sw.x = x
+                sw.y = y
+                sw.radius = 12f * unit
+                sw.maxRadius = maxRadius
+                sw.maxLife = 0.28f
+                sw.life = sw.maxLife
+                sw.color = color
+                return
+            }
+        }
+    }
+
+    private fun updateParticles(dt: Float) {
+        for (pt in particles) {
+            if (!pt.active) continue
+            pt.life -= dt
+            if (pt.life <= 0f) {
+                pt.active = false
+                continue
+            }
+            pt.x += pt.vx * dt
+            pt.y += pt.vy * dt
+            pt.vx *= 0.95f
+            pt.vy *= 0.95f
+        }
+    }
+
+    private fun updateShockwaves(dt: Float) {
+        for (sw in shockwaves) {
+            if (!sw.active) continue
+            sw.life -= dt
+            if (sw.life <= 0f) {
+                sw.active = false
+                continue
+            }
+            val progress = 1f - (sw.life / sw.maxLife)
+            sw.radius = 12f * unit + (sw.maxRadius - 12f * unit) * progress
+        }
+    }
+
+    fun getOceanScrollPx(): Float = oceanScrollPx
+    fun getElapsed(): Float = elapsedTime
+}
+
+// ============================================================================
+// UI & CANVAS SCREEN
+// ============================================================================
+
+@Composable
+private fun SkyStrikeApp() {
+    val context = LocalContext.current
+    val appContext = context.applicationContext
+    val haptic = LocalHapticFeedback.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val storage = remember { GameStorage(appContext) }
+    val sprites = remember { SpriteBank() }
+    val audio = remember { GameAudioManager(appContext) }
+    val engine = remember { SkyStrikeEngine(storage, sprites, audio) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            sprites.loadFromAssets(appContext)
+            audio.initialize(storage.sfxEnabled, storage.bgmEnabled)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    engine.pauseGame()
+                    audio.onAppPause()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    audio.onAppResume()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            audio.release()
+        }
+    }
+
+    LaunchedEffect(engine.hapticTrigger) {
+        if (engine.hapticTrigger > 0) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        var lastTimeNanos = 0L
+        while (isActive) {
+            withFrameNanos { frameTimeNanos ->
+                if (lastTimeNanos != 0L) {
+                    val dt = ((frameTimeNanos - lastTimeNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
+                    engine.update(dt)
+                }
+                lastTimeNanos = frameTimeNanos
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF061A2E))) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { size ->
+                    engine.setViewport(size.width.toFloat(), size.height.toFloat())
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        engine.movePlayer(dragAmount.x, dragAmount.y)
+                    }
+                }
+        ) {
+            val tick = engine.frameTick
+            if (tick >= 0L && engine.screenW > 0f) {
+                drawGameWorld(engine)
+            }
+        }
+
+        when (engine.phase) {
+            GamePhase.MENU -> MainMenuOverlay(engine)
+            GamePhase.PLAYING -> GameHudOverlay(engine)
+            GamePhase.PAUSED -> {
+                GameHudOverlay(engine)
+                PauseOverlay(engine)
+            }
+            GamePhase.GAME_OVER -> GameOverOverlay(engine)
+        }
+    }
+}
+
+// ============================================================================
+// HUD & MENUS
+// ============================================================================
+
+@Composable
+private fun GameHudOverlay(engine: SkyStrikeEngine) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "SCORE ${engine.score}",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "WAVE ${engine.wave}",
+                        color = Color(0xFF00E5FF),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Icon(
+                        imageVector = Icons.Rounded.MonetizationOn,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD740),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        text = "${engine.runCoins}",
+                        color = Color(0xFFFFD740),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0x66000000))
+                        .border(1.dp, Color(0x4400E5FF), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Favorite,
+                        contentDescription = null,
+                        tint = Color(0xFFFF5252),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "${engine.playerHp}/${engine.playerMaxHp}",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Rounded.Bolt,
+                        contentDescription = null,
+                        tint = Color(0xFF00E5FF),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = "W${engine.weaponLevel}",
+                        color = Color(0xFF00E5FF),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (engine.shieldActive) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Rounded.Shield,
+                            contentDescription = "Shield Active",
+                            tint = Color(0xFF40C4FF),
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = { engine.pauseGame() },
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x77000000))
+                        .border(1.dp, Color(0x55FFFFFF), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Pause,
+                        contentDescription = "Pause",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        if (engine.bossHpFraction > 0f) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 54.dp)
+                    .fillMaxWidth(0.82f),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "SKY FORTRESS BOSS",
+                    color = Color(0xFFFF5252),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.5.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0x99000000))
+                        .border(1.dp, Color(0xAAFF5252), RoundedCornerShape(6.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(engine.bossHpFraction)
+                            .height(10.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFFFF1744), Color(0xFFFF9100))
+                                )
+                            )
+                    )
+                }
+            }
+        }
+
+        if (engine.bannerText.isNotEmpty()) {
+            val isWarning = engine.bannerText.startsWith("WARNING")
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(bottom = 180.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isWarning) Color(0xCC5A0010) else Color(0xAA071A2F))
+                    .border(
+                        1.5.dp,
+                        if (isWarning) Color(0xFFFF1744) else Color(0xFF00E5FF),
+                        RoundedCornerShape(14.dp)
+                    )
+                    .padding(horizontal = 22.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = engine.bannerText,
+                    color = if (isWarning) Color(0xFFFFD740) else Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainMenuOverlay(engine: SkyStrikeEngine) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xBB050F1E), Color(0x55050F1E), Color(0xCC050F1E))
+                )
+            )
+            .safeDrawingPadding()
+            .padding(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StatPill(
+                icon = Icons.Rounded.Star,
+                iconTint = Color(0xFF00E5FF),
+                label = "BEST ${engine.highScore}"
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatPill(
+                    icon = Icons.Rounded.MonetizationOn,
+                    iconTint = Color(0xFFFFD740),
+                    label = "${engine.totalCoins}"
+                )
+                Spacer(Modifier.width(8.dp))
+                AudioToggleCircle(
+                    enabled = engine.sfxEnabled,
+                    onIcon = Icons.AutoMirrored.Rounded.VolumeUp,
+                    offIcon = Icons.AutoMirrored.Rounded.VolumeOff,
+                    contentDesc = "Toggle SFX",
+                    onClick = { engine.toggleSfx() }
+                )
+                Spacer(Modifier.width(6.dp))
+                AudioToggleCircle(
+                    enabled = engine.bgmEnabled,
+                    onIcon = Icons.Rounded.MusicNote,
+                    offIcon = Icons.Rounded.MusicOff,
+                    contentDesc = "Toggle BGM",
+                    onClick = { engine.toggleBgm() }
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "SKY STRIKE",
+                color = Color.White,
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 3.sp
+            )
+            Text(
+                text = "AIR FORCE ARCADE SHOOTER",
+                color = Color(0xFF00E5FF),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.5.sp
+            )
+
+            Spacer(Modifier.height(28.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xAA0B1B30))
+                    .border(1.dp, Color(0x4400E5FF), RoundedCornerShape(20.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "HANGAR UPGRADE",
+                    color = Color(0xFFB0BEC5),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                UpgradeRow(
+                    icon = Icons.Rounded.LocalFireDepartment,
+                    title = "Firepower",
+                    level = engine.firepowerLevel,
+                    cost = engine.upgradeCost(engine.firepowerLevel),
+                    canAfford = engine.totalCoins >= engine.upgradeCost(engine.firepowerLevel),
+                    onUpgrade = { engine.buyFirepower() }
+                )
+                UpgradeRow(
+                    icon = Icons.Rounded.Speed,
+                    title = "Fire Rate",
+                    level = engine.fireRateLevel,
+                    cost = engine.upgradeCost(engine.fireRateLevel),
+                    canAfford = engine.totalCoins >= engine.upgradeCost(engine.fireRateLevel),
+                    onUpgrade = { engine.buyFireRate() }
+                )
+                UpgradeRow(
+                    icon = Icons.Rounded.Shield,
+                    title = "Armor HP",
+                    level = engine.armorLevel,
+                    cost = engine.upgradeCost(engine.armorLevel),
+                    canAfford = engine.totalCoins >= engine.upgradeCost(engine.armorLevel),
+                    onUpgrade = { engine.buyArmor() }
+                )
+            }
+
+            Spacer(Modifier.height(28.dp))
+
+            Button(
+                onClick = { engine.startNewGame() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(58.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00E5FF),
+                    contentColor = Color(0xFF041220)
+                )
+            ) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "START MISSION",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp
+                )
+            }
+        }
+
+        Text(
+            text = "Geser layar untuk mengendalikan pesawat • Tembak otomatis",
+            color = Color(0xAAFFFFFF),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun AudioToggleCircle(
+    enabled: Boolean,
+    onIcon: ImageVector,
+    offIcon: ImageVector,
+    contentDesc: String,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .background(if (enabled) Color(0x3300E5FF) else Color(0x66000000))
+            .border(
+                1.dp,
+                if (enabled) Color(0x8800E5FF) else Color(0x44FFFFFF),
+                CircleShape
+            )
+    ) {
+        Icon(
+            imageVector = if (enabled) onIcon else offIcon,
+            contentDescription = contentDesc,
+            tint = if (enabled) Color(0xFF00E5FF) else Color(0x88FFFFFF),
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun StatPill(icon: ImageVector, iconTint: Color, label: String) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0x990A192C))
+            .border(1.dp, Color(0x44FFFFFF), RoundedCornerShape(20.dp))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+    }
+}
+
+@Composable
+private fun UpgradeRow(
+    icon: ImageVector,
+    title: String,
+    level: Int,
+    cost: Int,
+    canAfford: Boolean,
+    onUpgrade: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0x2200E5FF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Lv. $level / 10", color = Color(0xFF90CAF9), fontSize = 11.sp)
+            }
+        }
+
+        Button(
+            onClick = onUpgrade,
+            enabled = level < 10 && canAfford,
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFFFC107),
+                contentColor = Color(0xFF1A1200),
+                disabledContainerColor = Color(0x33FFFFFF),
+                disabledContentColor = Color(0x88FFFFFF)
+            )
+        ) {
+            Text(
+                text = if (level >= 10) "MAX" else "$cost",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun PauseOverlay(engine: SkyStrikeEngine) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xAA040D1A)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color(0xEE0D1E35))
+                .border(1.dp, Color(0x6600E5FF), RoundedCornerShape(22.dp))
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "PAUSED",
+                color = Color.White,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp
+            )
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                AudioToggleCircle(
+                    enabled = engine.sfxEnabled,
+                    onIcon = Icons.AutoMirrored.Rounded.VolumeUp,
+                    offIcon = Icons.AutoMirrored.Rounded.VolumeOff,
+                    contentDesc = "Toggle SFX",
+                    onClick = { engine.toggleSfx() }
+                )
+                AudioToggleCircle(
+                    enabled = engine.bgmEnabled,
+                    onIcon = Icons.Rounded.MusicNote,
+                    offIcon = Icons.Rounded.MusicOff,
+                    contentDesc = "Toggle BGM",
+                    onClick = { engine.toggleBgm() }
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = { engine.resumeGame() },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00E5FF),
+                    contentColor = Color(0xFF041220)
+                )
+            ) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("RESUME", fontWeight = FontWeight.Black)
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { engine.returnToMenu() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Rounded.Home, contentDescription = null, tint = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text("HANGAR MENU", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameOverOverlay(engine: SkyStrikeEngine) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xBB050D1A)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xF00D1D33))
+                .border(1.5.dp, Color(0x88FF5252), RoundedCornerShape(24.dp))
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "MISSION FAILED",
+                color = Color(0xFFFF5252),
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 2.sp
+            )
+            Spacer(Modifier.height(18.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ResultMetric("SCORE", "${engine.score}", Color.White)
+                ResultMetric("BEST", "${engine.highScore}", Color(0xFF00E5FF))
+                ResultMetric("COINS", "+${engine.runCoins}", Color(0xFFFFD740))
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(
+                onClick = { engine.startNewGame() },
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00E5FF),
+                    contentColor = Color(0xFF041220)
+                )
+            ) {
+                Icon(Icons.Rounded.Refresh, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("PLAY AGAIN", fontSize = 16.sp, fontWeight = FontWeight.Black)
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            OutlinedButton(
+                onClick = { engine.returnToMenu() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) {
+                Icon(Icons.Rounded.Home, contentDescription = null, tint = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text("HANGAR & UPGRADE", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultMetric(label: String, value: String, valueColor: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Color(0xFF90A4AE), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(3.dp))
+        Text(value, color = valueColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
+    }
+}
+
+// ============================================================================
+// HD RENDERER (PNG/JPG SPRITES + 3D DROP SHADOW + MIRROR SCROLLING + JUICE)
+// ============================================================================
+
+private val hitFlashFilter = ColorFilter.tint(Color.White, BlendMode.SrcAtop)
+private val dropShadowFilter = ColorFilter.tint(Color(0x55000000), BlendMode.SrcIn)
+
+private fun DrawScope.drawSpriteCentered(
+    sprite: ImageBitmap,
+    cx: Float,
+    cy: Float,
+    widthPx: Float,
+    heightPx: Float,
+    colorFilter: ColorFilter? = null
+) {
+    val sw = sprite.width.toFloat().coerceAtLeast(1f)
+    val sh = sprite.height.toFloat().coerceAtLeast(1f)
+    val scaleFactor = minOf(widthPx / sw, heightPx / sh)
+    val w = (sw * scaleFactor).roundToInt().coerceAtLeast(1)
+    val h = (sh * scaleFactor).roundToInt().coerceAtLeast(1)
+    drawImage(
+        image = sprite,
+        dstOffset = IntOffset((cx - w * 0.5f).roundToInt(), (cy - h * 0.5f).roundToInt()),
+        dstSize = IntSize(w, h),
+        colorFilter = colorFilter,
+        filterQuality = FilterQuality.High
+    )
+}
+
+private fun DrawScope.drawGameWorld(engine: SkyStrikeEngine) {
+    val u = engine.unit
+
+    translate(left = engine.shakeOffsetX, top = engine.shakeOffsetY) {
+        // 1. Background (Seamless Mirror-Scrolling Map OR Procedural Ocean)
+        val bgSprite = engine.sprites.bgOcean
+        if (bgSprite != null && bgSprite.width > 0 && bgSprite.height > 0) {
+            val tileW = size.width.roundToInt().coerceAtLeast(1)
+            val tileH = (size.width * (bgSprite.height.toFloat() / bgSprite.width.toFloat()))
+                .roundToInt().coerceAtLeast(1)
+            val cycleH = tileH * 2
+            val scroll = (engine.getOceanScrollPx() % cycleH).roundToInt()
+
+            var k = -2
+            while (true) {
+                val tileTop = scroll + k * tileH
+                if (tileTop >= size.height) break
+                if (tileTop + tileH > 0) {
+                    val flipped = (k and 1) != 0
+                    if (flipped) {
+                        scale(
+                            scaleX = 1f,
+                            scaleY = -1f,
+                            pivot = Offset(size.width * 0.5f, tileTop + tileH * 0.5f)
+                        ) {
+                            drawImage(
+                                image = bgSprite,
+                                dstOffset = IntOffset(0, tileTop),
+                                dstSize = IntSize(tileW, tileH + 1),
+                                filterQuality = FilterQuality.High
+                            )
+                        }
+                    } else {
+                        drawImage(
+                            image = bgSprite,
+                            dstOffset = IntOffset(0, tileTop),
+                            dstSize = IntSize(tileW, tileH + 1),
+                            filterQuality = FilterQuality.High
+                        )
+                    }
+                }
+                k++
+            }
+        } else {
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF08223C), Color(0xFF0C3559), Color(0xFF072038))
+                )
+            )
+            val waveSpacing = 120f * u
+            var wy = (engine.getOceanScrollPx() % waveSpacing) - waveSpacing
+            while (wy < size.height + waveSpacing) {
+                drawLine(
+                    color = Color(0x1480D8FF),
+                    start = Offset(0f, wy),
+                    end = Offset(size.width, wy),
+                    strokeWidth = 2f * u
+                )
+                wy += waveSpacing
+            }
+            for (island in engine.islands) {
+                rotate(degrees = island.rotation, pivot = Offset(island.x, island.y)) {
+                    drawOval(
+                        color = Color(0x331DE9B6),
+                        topLeft = Offset(island.x - island.radiusX * 1.18f, island.y - island.radiusY * 1.18f),
+                        size = Size(island.radiusX * 2.36f, island.radiusY * 2.36f)
+                    )
+                    drawOval(
+                        color = Color(0x55C8B575),
+                        topLeft = Offset(island.x - island.radiusX, island.y - island.radiusY),
+                        size = Size(island.radiusX * 2f, island.radiusY * 2f)
+                    )
+                    drawOval(
+                        color = Color(0x661E5631),
+                        topLeft = Offset(island.x - island.radiusX * 0.72f, island.y - island.radiusY * 0.72f),
+                        size = Size(island.radiusX * 1.44f, island.radiusY * 1.44f)
+                    )
+                }
+            }
+        }
+
+        // 2. Power-Ups & Coins
+        for (p in engine.powerUps) {
+            if (!p.active) continue
+            drawPowerUp(p, u, engine.sprites)
+        }
+
+        // 3. Player Bullets (bullet_main.png, missile.png, lasser.png)
+        for (b in engine.playerBullets) {
+            if (!b.active) continue
+            drawPlayerBullet(b, u, engine.sprites)
+        }
+
+        // 4. Enemies & Boss
+        for (e in engine.enemies) {
+            if (!e.active) continue
+            drawEnemyPlane(e, u, engine.reusablePath, engine.sprites)
+        }
+
+        // 5. Enemy Bullets (bomb.png, missile.png, plasma)
+        for (b in engine.enemyBullets) {
+            if (!b.active) continue
+            drawEnemyBullet(b, u, engine.sprites)
+        }
+
+        // 6. Player Fighter Jet
+        if (engine.phase != GamePhase.GAME_OVER) {
+            val blinkVisible = engine.invulnTimer <= 0f || ((engine.invulnTimer * 18f).toInt() % 2 == 0)
+            if (blinkVisible) {
+                drawPlayerPlane(engine, u)
+            }
+        }
+
+        // 7. Shockwave Rings & Explosion Particles
+        for (sw in engine.shockwaves) {
+            if (!sw.active) continue
+            val alpha = (sw.life / sw.maxLife).coerceIn(0f, 1f)
+            drawCircle(
+                color = sw.color.copy(alpha = alpha * 0.7f),
+                radius = sw.radius,
+                center = Offset(sw.x, sw.y),
+                style = Stroke(width = (8f * u * alpha).coerceAtLeast(1f))
+            )
+        }
+        for (pt in engine.particles) {
+            if (!pt.active) continue
+            val alpha = (pt.life / pt.maxLife).coerceIn(0f, 1f)
+            drawCircle(
+                color = pt.color.copy(alpha = alpha),
+                radius = pt.size * alpha,
+                center = Offset(pt.x, pt.y)
+            )
+        }
+
+        // 8. Foreground Drifting Clouds
+        for (cloud in engine.clouds) {
+            drawCircle(
+                color = Color.White.copy(alpha = cloud.alpha),
+                radius = cloud.radius,
+                center = Offset(cloud.x, cloud.y)
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = cloud.alpha * 0.8f),
+                radius = cloud.radius * 0.72f,
+                center = Offset(cloud.x + cloud.radius * 0.5f, cloud.y + cloud.radius * 0.25f)
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawPlayerBullet(b: Bullet, u: Float, sprites: SpriteBank) {
+    val sprite = when (b.style) {
+        BulletStyle.LASER -> sprites.laser ?: sprites.bullet
+        BulletStyle.MISSILE -> sprites.missile ?: sprites.bullet
+        BulletStyle.NORMAL, BulletStyle.BOMB -> sprites.bullet
+    }
+
+    if (sprite != null) {
+        val angleDeg = (atan2(b.vy, b.vx) * (180f / PI.toFloat())) + 90f
+        val drawSize = when (b.style) {
+            BulletStyle.LASER -> 74f * u
+            BulletStyle.MISSILE -> 64f * u
+            BulletStyle.NORMAL, BulletStyle.BOMB -> 46f * u
+        }
+        rotate(degrees = angleDeg, pivot = Offset(b.x, b.y)) {
+            drawSpriteCentered(sprite, b.x, b.y, drawSize, drawSize)
+        }
+    } else {
+        drawRoundRect(
+            color = b.color.copy(alpha = 0.35f),
+            topLeft = Offset(b.x - b.radius * 0.9f, b.y - b.radius * 2.4f),
+            size = Size(b.radius * 1.8f, b.radius * 4.8f),
+            cornerRadius = CornerRadius(b.radius, b.radius)
+        )
+        drawRoundRect(
+            color = Color.White,
+            topLeft = Offset(b.x - b.radius * 0.42f, b.y - b.radius * 1.9f),
+            size = Size(b.radius * 0.84f, b.radius * 3.8f),
+            cornerRadius = CornerRadius(b.radius, b.radius)
+        )
+    }
+}
+
+private fun DrawScope.drawEnemyBullet(b: Bullet, u: Float, sprites: SpriteBank) {
+    when (b.style) {
+        BulletStyle.BOMB -> {
+            val bombSprite = sprites.bomb
+            if (bombSprite != null) {
+                val s = 54f * u
+                drawCircle(Color(0x44FF9100), radius = b.radius * 1.4f, center = Offset(b.x, b.y))
+                drawSpriteCentered(bombSprite, b.x, b.y, s, s)
+                return
+            }
+        }
+        BulletStyle.MISSILE -> {
+            val missileSprite = sprites.missile
+            if (missileSprite != null) {
+                val angleDeg = (atan2(b.vy, b.vx) * (180f / PI.toFloat())) + 90f
+                val s = 60f * u
+                rotate(degrees = angleDeg, pivot = Offset(b.x, b.y)) {
+                    drawSpriteCentered(missileSprite, b.x, b.y, s, s)
+                }
+                return
+            }
+        }
+        BulletStyle.NORMAL, BulletStyle.LASER -> Unit
+    }
+
+    drawCircle(color = b.color.copy(alpha = 0.35f), radius = b.radius * 1.55f, center = Offset(b.x, b.y))
+    drawCircle(color = b.color, radius = b.radius, center = Offset(b.x, b.y))
+    drawCircle(color = Color.White, radius = b.radius * 0.45f, center = Offset(b.x, b.y))
+}
+
+private fun DrawScope.drawPlayerPlane(engine: SkyStrikeEngine, u: Float) {
+    val x = engine.playerX
+    val y = engine.playerY
+    val path = engine.reusablePath
+    val pulse = 0.85f + 0.15f * sin(engine.getElapsed() * 32f)
+    val playerSprite = engine.sprites.player
+
+    // 3D Dynamic Drop Shadow under Player Plane
+    if (playerSprite != null) {
+        rotate(degrees = engine.playerBank * 14f, pivot = Offset(x + 20f * u, y + 26f * u)) {
+            drawSpriteCentered(
+                sprite = playerSprite,
+                cx = x + 20f * u,
+                cy = y + 26f * u,
+                widthPx = 152f * u,
+                heightPx = 152f * u,
+                colorFilter = dropShadowFilter
+            )
+        }
+    }
+
+    rotate(degrees = engine.playerBank * 14f, pivot = Offset(x, y)) {
+        if (engine.muzzleFlashTimer > 0f) {
+            drawCircle(
+                color = Color(0x8800E5FF),
+                radius = 24f * u,
+                center = Offset(x, y - 54f * u)
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 10f * u,
+                center = Offset(x, y - 54f * u)
+            )
+        }
+
+        drawOval(
+            color = Color(0xFF00E5FF).copy(alpha = 0.75f),
+            topLeft = Offset(x - 22f * u, y + 40f * u),
+            size = Size(14f * u, 30f * u * pulse)
+        )
+        drawOval(
+            color = Color(0xFF00E5FF).copy(alpha = 0.75f),
+            topLeft = Offset(x + 8f * u, y + 40f * u),
+            size = Size(14f * u, 30f * u * pulse)
+        )
+
+        if (playerSprite != null) {
+            drawSpriteCentered(
+                sprite = playerSprite,
+                cx = x,
+                cy = y,
+                widthPx = 165f * u,
+                heightPx = 165f * u
+            )
+        } else {
+            path.reset()
+            path.moveTo(x, y - 34f * u)
+            path.lineTo(x + 62f * u, y + 18f * u)
+            path.lineTo(x + 56f * u, y + 30f * u)
+            path.lineTo(x + 14f * u, y + 20f * u)
+            path.lineTo(x - 14f * u, y + 20f * u)
+            path.lineTo(x - 56f * u, y + 30f * u)
+            path.lineTo(x - 62f * u, y + 18f * u)
+            path.close()
+            drawPath(path = path, color = Color(0xFFCFD8DC))
+
+            drawLine(
+                color = Color(0xFF00B0FF),
+                start = Offset(x - 46f * u, y + 16f * u),
+                end = Offset(x - 20f * u, y + 4f * u),
+                strokeWidth = 6f * u,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = Color(0xFF00B0FF),
+                start = Offset(x + 46f * u, y + 16f * u),
+                end = Offset(x + 20f * u, y + 4f * u),
+                strokeWidth = 6f * u,
+                cap = StrokeCap.Round
+            )
+
+            path.reset()
+            path.moveTo(x, y + 18f * u)
+            path.lineTo(x + 30f * u, y + 44f * u)
+            path.lineTo(x + 24f * u, y + 48f * u)
+            path.lineTo(x - 24f * u, y + 48f * u)
+            path.lineTo(x - 30f * u, y + 44f * u)
+            path.close()
+            drawPath(path = path, color = Color(0xFF90A4AE))
+
+            path.reset()
+            path.moveTo(x, y - 54f * u)
+            path.lineTo(x + 14f * u, y - 10f * u)
+            path.lineTo(x + 12f * u, y + 42f * u)
+            path.lineTo(x - 12f * u, y + 42f * u)
+            path.lineTo(x - 14f * u, y - 10f * u)
+            path.close()
+            drawPath(path = path, color = Color(0xFFECEFF1))
+
+            drawOval(
+                color = Color(0xFF00E5FF),
+                topLeft = Offset(x - 7f * u, y - 26f * u),
+                size = Size(14f * u, 28f * u)
+            )
+        }
+    }
+
+    if (engine.shieldTimer > 0f) {
+        drawCircle(color = Color(0x3300E5FF), radius = 84f * u, center = Offset(x, y))
+        drawCircle(
+            color = Color(0xCC00E5FF),
+            radius = 84f * u,
+            center = Offset(x, y),
+            style = Stroke(width = 4f * u)
+        )
+    }
+}
+
+private fun DrawScope.drawEnemyPlane(e: Enemy, u: Float, path: Path, sprites: SpriteBank) {
+    val x = e.x
+    val y = e.y
+    val r = e.radius
+    val isFlashing = e.hitFlash > 0f
+
+    val customSprite = when (e.type) {
+        EnemyType.SCOUT -> sprites.enemyScout
+        EnemyType.STRIKER -> sprites.enemyStriker
+        EnemyType.BOMBER -> sprites.enemyBomber
+        EnemyType.BOSS -> sprites.boss
+    }
+
+    if (customSprite != null) {
+        val drawSize = if (e.type == EnemyType.BOSS) r * 2.65f else r * 2.45f
+        val shadowShiftX = if (e.type == EnemyType.BOSS) 28f * u else 16f * u
+        val shadowShiftY = if (e.type == EnemyType.BOSS) 36f * u else 22f * u
+
+        // Jika Boss ternyata sudah benar menghadap bawah, ubah baris ini jadi:
+        // val angle = if (e.type == EnemyType.BOSS) 0f else 180f
+        val angle = 180f
+
+        rotate(degrees = angle, pivot = Offset(x + shadowShiftX, y + shadowShiftY)) {
+            drawSpriteCentered(
+                sprite = customSprite,
+                cx = x + shadowShiftX,
+                cy = y + shadowShiftY,
+                widthPx = drawSize * 0.94f,
+                heightPx = drawSize * 0.94f,
+                colorFilter = dropShadowFilter
+            )
+        }
+        rotate(degrees = angle, pivot = Offset(x, y)) {
+            drawSpriteCentered(
+                sprite = customSprite,
+                cx = x,
+                cy = y,
+                widthPx = drawSize,
+                heightPx = drawSize,
+                colorFilter = if (isFlashing) hitFlashFilter else null
+            )
+        }
+    } else {
+        when (e.type) {
+            EnemyType.SCOUT -> {
+                val bodyColor = if (isFlashing) Color.White else Color(0xFF9CCC65)
+                val wingColor = if (isFlashing) Color.White else Color(0xFF558B2F)
+
+                path.reset()
+                path.moveTo(x, y + r)
+                path.lineTo(x + r * 0.95f, y - r * 0.25f)
+                path.lineTo(x, y - r * 0.65f)
+                path.lineTo(x - r * 0.95f, y - r * 0.25f)
+                path.close()
+                drawPath(path, wingColor)
+
+                drawOval(bodyColor, Offset(x - r * 0.26f, y - r * 0.75f), Size(r * 0.52f, r * 1.55f))
+                drawCircle(Color(0xFFFFD740), r * 0.16f, Offset(x, y + r * 0.1f))
+            }
+
+            EnemyType.STRIKER -> {
+                val bodyColor = if (isFlashing) Color.White else Color(0xFFEF5350)
+                val wingColor = if (isFlashing) Color.White else Color(0xFFB71C1C)
+
+                path.reset()
+                path.moveTo(x, y + r * 0.95f)
+                path.lineTo(x + r * 1.05f, y - r * 0.1f)
+                path.lineTo(x + r * 0.75f, y - r * 0.75f)
+                path.lineTo(x - r * 0.75f, y - r * 0.75f)
+                path.lineTo(x - r * 1.05f, y - r * 0.1f)
+                path.close()
+                drawPath(path, wingColor)
+
+                drawOval(bodyColor, Offset(x - r * 0.3f, y - r * 0.85f), Size(r * 0.6f, r * 1.75f))
+                drawCircle(Color(0xFFFFAB40), r * 0.18f, Offset(x, y + r * 0.15f))
+            }
+
+            EnemyType.BOMBER -> {
+                val hullColor = if (isFlashing) Color.White else Color(0xFF546E7A)
+                val accentColor = if (isFlashing) Color.White else Color(0xFFFF6D00)
+
+                drawRoundRect(
+                    color = hullColor,
+                    topLeft = Offset(x - r * 1.15f, y - r * 0.3f),
+                    size = Size(r * 2.3f, r * 0.58f),
+                    cornerRadius = CornerRadius(12f * u, 12f * u)
+                )
+                drawOval(accentColor, Offset(x - r * 0.65f, y - r * 0.6f), Size(r * 0.32f, r * 1.15f))
+                drawOval(accentColor, Offset(x + r * 0.33f, y - r * 0.6f), Size(r * 0.32f, r * 1.15f))
+                drawOval(Color(0xFF37474F), Offset(x - r * 0.34f, y - r * 0.85f), Size(r * 0.68f, r * 1.75f))
+                drawCircle(Color(0xFFFFD740), r * 0.18f, Offset(x, y + r * 0.25f))
+            }
+
+            EnemyType.BOSS -> {
+                val armor = if (isFlashing) Color.White else Color(0xFF37474F)
+                val trim = if (isFlashing) Color.White else Color(0xFFD50000)
+
+                path.reset()
+                path.moveTo(x - r * 1.25f, y - r * 0.15f)
+                path.lineTo(x + r * 1.25f, y - r * 0.15f)
+                path.lineTo(x + r * 0.95f, y + r * 0.45f)
+                path.lineTo(x - r * 0.95f, y + r * 0.45f)
+                path.close()
+                drawPath(path, armor)
+
+                drawRect(trim, Offset(x - r * 0.72f, y + r * 0.2f), Size(r * 0.24f, r * 0.55f))
+                drawRect(trim, Offset(x + r * 0.48f, y + r * 0.2f), Size(r * 0.24f, r * 0.55f))
+
+                drawOval(Color(0xFF263238), Offset(x - r * 0.48f, y - r * 0.75f), Size(r * 0.96f, r * 1.55f))
+                drawCircle(Color(0xFFFF1744), r * 0.24f, Offset(x, y + r * 0.1f))
+                drawCircle(Color(0xFFFFD740), r * 0.12f, Offset(x, y + r * 0.1f))
+            }
+        }
+    }
+
+    if (e.type != EnemyType.BOSS && e.hp < e.maxHp) {
+        val barW = r * 1.4f
+        val barH = 6f * u
+        val top = y - r - 14f * u
+        drawRect(Color(0x88000000), Offset(x - barW * 0.5f, top), Size(barW, barH))
+        drawRect(
+            Color(0xFFFF5252),
+            Offset(x - barW * 0.5f, top),
+            Size(barW * (e.hp / e.maxHp).coerceIn(0f, 1f), barH)
+        )
+    }
+}
+
+private fun DrawScope.drawPowerUp(p: PowerUp, u: Float, sprites: SpriteBank) {
+    val pulse = 1f + 0.1f * sin(p.age * 8f)
+    val r = p.radius * pulse
+    val customSprite = when (p.type) {
+        PowerUpType.COIN -> sprites.coin
+        PowerUpType.WEAPON -> sprites.powerWeapon
+        PowerUpType.SHIELD -> sprites.powerShield
+        PowerUpType.REPAIR -> sprites.powerRepair
+    }
+
+    if (customSprite != null) {
+        val glowColor = when (p.type) {
+            PowerUpType.COIN -> Color(0x44FFD740)
+            PowerUpType.WEAPON -> Color(0x4400E5FF)
+            PowerUpType.SHIELD -> Color(0x4440C4FF)
+            PowerUpType.REPAIR -> Color(0x4469F0AE)
+        }
+        drawCircle(glowColor, radius = r * 1.25f, center = Offset(p.x, p.y))
+        drawSpriteCentered(customSprite, p.x, p.y, r * 2.2f, r * 2.2f)
+        return
+    }
+
+    val color = when (p.type) {
+        PowerUpType.COIN -> Color(0xFFFFD740)
+        PowerUpType.WEAPON -> Color(0xFF00E5FF)
+        PowerUpType.SHIELD -> Color(0xFF40C4FF)
+        PowerUpType.REPAIR -> Color(0xFF69F0AE)
+    }
+
+    drawCircle(color.copy(alpha = 0.28f), radius = r * 1.4f, center = Offset(p.x, p.y))
+    drawCircle(color, radius = r, center = Offset(p.x, p.y))
+    drawCircle(Color(0xFF071A2F), radius = r * 0.65f, center = Offset(p.x, p.y))
+
+    when (p.type) {
+        PowerUpType.COIN -> {
+            drawCircle(Color(0xFFFFD740), radius = r * 0.36f, center = Offset(p.x, p.y))
+        }
+        PowerUpType.REPAIR -> {
+            drawLine(color, Offset(p.x - r * 0.35f, p.y), Offset(p.x + r * 0.35f, p.y), 5f * u, StrokeCap.Round)
+            drawLine(color, Offset(p.x, p.y - r * 0.35f), Offset(p.x, p.y + r * 0.35f), 5f * u, StrokeCap.Round)
+        }
+        PowerUpType.WEAPON -> {
+            drawLine(color, Offset(p.x, p.y - r * 0.38f), Offset(p.x, p.y + r * 0.38f), 5f * u, StrokeCap.Round)
+            drawLine(color, Offset(p.x - r * 0.28f, p.y - r * 0.1f), Offset(p.x, p.y - r * 0.38f), 5f * u, StrokeCap.Round)
+            drawLine(color, Offset(p.x + r * 0.28f, p.y - r * 0.1f), Offset(p.x, p.y - r * 0.38f), 5f * u, StrokeCap.Round)
+        }
+        PowerUpType.SHIELD -> {
+            drawCircle(color, radius = r * 0.34f, center = Offset(p.x, p.y), style = Stroke(4f * u))
+        }
+    }
+}
